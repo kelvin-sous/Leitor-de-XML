@@ -19,7 +19,7 @@ app.post('/parseXML', (req, res) => {
         return res.status(400).send('Nenhum arquivo enviado.');
     }
 
-    const files = req.files.files;
+    const files = Array.isArray(req.files.files) ? req.files.files : [req.files.files];
     const promises = [];
 
     for (let i = 0; i < Math.min(files.length, 20); i++) {
@@ -32,7 +32,10 @@ app.post('/parseXML', (req, res) => {
                     reject(err);
                 } else {
                     parseXML(filePath)
-                        .then((data) => resolve(data))
+                        .then((data) => {
+                            fs.unlink(filePath, () => {});
+                            resolve(data);
+                        })
                         .catch((error) => reject(error));
                 }
             });
@@ -40,7 +43,10 @@ app.post('/parseXML', (req, res) => {
     }
 
     Promise.all(promises)
-        .then((results) => res.json(results))
+        .then((results) => {
+            const totalValue = results.reduce((sum, item) => sum + parseFloat(item.vNF), 0);
+            res.json({ results, totalValue });
+        })
         .catch((error) => res.status(500).send(error));
 });
 
@@ -76,7 +82,7 @@ function extractFields(parsedXML) {
         dhEmi: ide?.dhEmi?.[0] || 'N/A',
         emit_xNome: emit?.xNome?.[0] || 'N/A',
         dest_xNome: dest?.xNome?.[0] || 'N/A',
-        vNF: total?.vNF?.[0] || 'N/A',
+        vNF: total?.vNF?.[0] || '0',  // Default to '0' if not available
     };
 
     return fields;
