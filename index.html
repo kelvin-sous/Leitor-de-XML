@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,66 +8,203 @@
     <style>
         body {
             font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
             margin: 0;
-            padding: 0;
+        }
+
+        #masterhead {
+            background-color: #000;
+            width: 100%;
+            height: 100px;
+            opacity: 85%;
+            padding: 1% 15%;
             display: flex;
             justify-content: center;
             align-items: center;
-            height: 100vh;
+            box-sizing: border-box;
         }
+
         #container {
-            max-width: 600px;
+            min-width: 1200px;
             padding: 20px;
             border: 1px solid #ccc;
             border-radius: 5px;
+            position: relative;
         }
+
+        #fileDropArea {
+            position: absolute;
+            top: 0;
+            right: 0;
+            height: 176px;
+            width: 250px;
+            border: 2px dashed #349980;
+            border-radius: 5px;
+            justify-content: center;
+            align-items: center;
+            line-height: 11;
+            text-align: center;
+            cursor: pointer;
+        }
+
+        #fileInputContainer {
+            display: flex;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        #fileInput {
+            display: none;
+        }
+
+        .custom-file-upload {
+            background-color: #349980;
+            font-size: 16px;
+            color: #fff;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 0 10px;
+        }
+
+        .custom-file-upload:hover {
+            background-color: #49b89c;
+        }
+
         #result {
             margin-top: 20px;
         }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        table,
+        th,
+        td {
+            border: 1px solid #ccc;
+        }
+
+        th,
+        td {
+            padding: 10px;
+            text-align: left;
+        }
+
+        th {
+            background-color: #f2f2f2;
+        }
     </style>
 </head>
+
 <body>
-    <div id="container">
-        <h1>Analisador XML</h1>
-        <input type="file" id="fileInput" accept=".xml"><br>
-        <button onclick="parseXML()">Analisar XML</button>
-        <div id="result"></div>
-    </div>
 
-    <script>
-        async function parseXML() {
-            const fileInput = document.getElementById('fileInput');
-            const file = fileInput.files[0];
-            if (!file) {
-                alert('Por favor, selecione um arquivo XML.');
-                return;
+    <header id="masterhead">
+        <logo>
+            <img height="80" class="site-logo"
+                src="http://suxberger.com.br/wp-content/uploads/2019/01/Suxberger-Logo-2.png" alt="Suxberger Soluções">
+        </logo>
+    </header>
+
+    <br>
+
+    <main>
+        <div id="container">
+            <h1>Analisador XML</h1>
+            <div id="fileDropArea" ondrop="handleFileDrop(event)" ondragover="handleDragOver(event)">Arraste e solte arquivos aqui</div>
+            <div id="fileInputContainer">
+                <label for="fileInput" class="custom-file-upload">
+                    Escolher arquivos
+                </label>
+                <input type="file" id="fileInput" accept=".xml" multiple onchange="handleFileSelect(event)">
+            </div>
+            <div id="fileList"></div> 
+            <div id="result"></div>
+        </div>
+
+        <script>
+            function handleFileSelect(event) {
+                const fileList = event.target.files;
+                handleFiles(fileList);
             }
 
-            const formData = new FormData();
-            formData.append('file', file);
-
-            try {
-                const response = await fetch('/parseXML', {
-                    method: 'POST',
-                    body: formData
-                });
-                const data = await response.json();
-                displayResult(data);
-            } catch (error) {
-                console.error('Erro ao analisar XML:', error);
+            function handleFileDrop(event) {
+                event.preventDefault();
+                const fileList = event.dataTransfer.files;
+                handleFiles(fileList);
             }
-        }
 
-        function displayResult(data) {
-            const resultDiv = document.getElementById('result');
-            resultDiv.innerHTML = `
-                <h2>Resultados:</h2>
-                <p>Data de Emissão: ${data.dhEmi}</p>
-                <p>Razão Social Emitidora: ${data.emit_xNome}</p>
-                <p>Razão Social Atendido: ${data.dest_xNome}</p>
-                <p>Valor Total da Nota: ${data.vNF}</p>
+            function handleDragOver(event) {
+                event.preventDefault();
+            }
+
+            function handleFiles(files) {
+                const fileList = document.getElementById('fileList');
+                fileList.innerHTML = '';
+                for (let i = 0; i < Math.min(files.length, 20); i++) {
+                    const file = files[i];
+                    fileList.innerHTML += `<div>${file.name}</div>`;
+                }
+
+                processFiles(files);
+            }
+
+            async function processFiles(files) {
+                const formData = new FormData();
+                for (let i = 0; i < files.length; i++) {
+                    formData.append('files', files[i]);
+                }
+
+                try {
+                    const response = await fetch('/parseXML', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    const { results, totalValue } = await response.json();
+                    displayResults(results, totalValue);
+                } catch (error) {
+                    console.error('Erro ao analisar XML:', error);
+                }
+            }
+
+            function displayResults(data, totalValue) {
+                const resultDiv = document.getElementById('result');
+                resultDiv.innerHTML = `
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Nº</th>
+                            <th>Razão Social Atendido</th>
+                            <th>Razão Social Emitida</th>
+                            <th>Data de Emissão</th>
+                            <th>Valor Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    </tbody>
+                </table>
+                <h2>Total: ${totalValue.toFixed(2)}</h2>
             `;
-        }
-    </script>
+                const tbody = resultDiv.querySelector('tbody');
+                data.forEach((result, index) => {
+                    tbody.innerHTML += `
+                    <tr>
+                        <td>${index + 1}</td>
+                        <td>${result.dest_xNome}</td>
+                        <td>${result.emit_xNome}</td>
+                        <td>${result.dhEmi}</td>
+                        <td>${parseFloat(result.vNF).toFixed(2)}</td>
+                    </tr>
+                `;
+                });
+            }
+        </script>
+    </main>
 </body>
+
 </html>
