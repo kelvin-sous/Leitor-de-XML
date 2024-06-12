@@ -14,23 +14,34 @@ app.get('/', (req, res) => {
 });
 
 // Rota para analisar o XML
-app.post('/parseXML', (req, res) => {
-    if (!req.files || !req.files.file) {
+app.post('/parseXML', (req, res) => { 
+    if (!req.files || !req.files.files) {
         return res.status(400).send('Nenhum arquivo enviado.');
     }
 
-    const file = req.files.file;
-    const filePath = `${__dirname}/${file.name}`;
+    const files = req.files.files;
+    const promises = [];
 
-    file.mv(filePath, (err) => {
-        if (err) {
-            return res.status(500).send(err);
-        }
+    for (let i = 0; i < Math.min(files.length, 20); i++) {
+        const file = files[i];
+        const filePath = `${__dirname}/${file.name}`;
 
-        parseXML(filePath)
-            .then((data) => res.json(data))
-            .catch((error) => res.status(500).send(error));
-    });
+        promises.push(new Promise((resolve, reject) => {
+            file.mv(filePath, (err) => {
+                if (err) {
+                    reject(err);
+                } else {
+                    parseXML(filePath)
+                        .then((data) => resolve(data))
+                        .catch((error) => reject(error));
+                }
+            });
+        }));
+    }
+
+    Promise.all(promises)
+        .then((results) => res.json(results))
+        .catch((error) => res.status(500).send(error));
 });
 
 // Função para analisar o XML
@@ -73,5 +84,5 @@ function extractFields(parsedXML) {
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
+    console.log(`Servidor na porta ${PORT}`);
 });

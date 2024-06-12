@@ -1,25 +1,26 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
+<head> 
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Analisador XML</title>
     <style>
         body {
             font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 0;
+            padding: 100px;
             display: flex;
             justify-content: center;
             align-items: center;
-            height: 100vh;
+            height: auto;
         }
+
         #container {
             max-width: 600px;
             padding: 20px;
             border: 1px solid #ccc;
             border-radius: 5px;
         }
+        
         #result {
             margin-top: 20px;
         }
@@ -28,22 +29,37 @@
 <body>
     <div id="container">
         <h1>Analisador XML</h1>
-        <input type="file" id="fileInput" accept=".xml"><br>
+        <input type="file" id="fileInput" accept=".xml" multiple><br><br>
+        <div id="fileList"></div> <!-- Display selected files -->
         <button onclick="parseXML()">Analisar XML</button>
         <div id="result"></div>
     </div>
 
     <script>
+        function handleFileSelect(event) {
+            const fileList = document.getElementById('fileList');
+            fileList.innerHTML = '';
+            const files = event.target.files;
+            for (let i = 0; i < Math.min(files.length, 20); i++) {
+                const file = files[i];
+                fileList.innerHTML += `<div>${file.name}</div>`;
+            }
+        }
+
+        document.getElementById('fileInput').addEventListener('change', handleFileSelect);
+
         async function parseXML() {
             const fileInput = document.getElementById('fileInput');
-            const file = fileInput.files[0];
-            if (!file) {
-                alert('Por favor, selecione um arquivo XML.');
+            const files = fileInput.files;
+            if (!files.length) {
+                alert('Por favor, selecione pelo menos um arquivo XML.');
                 return;
             }
 
             const formData = new FormData();
-            formData.append('file', file);
+            for (let i = 0; i < Math.min(files.length, 20); i++) {
+                formData.append('files', files[i]);
+            }
 
             try {
                 const response = await fetch('/parseXML', {
@@ -51,21 +67,25 @@
                     body: formData
                 });
                 const data = await response.json();
-                displayResult(data);
+                displayResults(data);
             } catch (error) {
                 console.error('Erro ao analisar XML:', error);
             }
         }
 
-        function displayResult(data) {
+        function displayResults(data) {
             const resultDiv = document.getElementById('result');
-            resultDiv.innerHTML = `
-                <h2>Resultados:</h2>
-                <p>Data de Emissão: ${data.dhEmi}</p>
-                <p>Razão Social Emitidora: ${data.emit_xNome}</p>
-                <p>Razão Social Atendido: ${data.dest_xNome}</p>
-                <p>Valor Total da Nota: ${data.vNF}</p>
-            `;
+            resultDiv.innerHTML = '';
+            data.forEach((result, index) => {
+                resultDiv.innerHTML += `
+                    <h2>Arquivo ${index + 1}:</h2>
+                    <p>Data de Emissão: ${result.dhEmi}</p>
+                    <p>Razão Social Emitidora: ${result.emit_xNome}</p>
+                    <p>Razão Social Atendido: ${result.dest_xNome}</p>
+                    <p>Valor Total da Nota: ${result.vNF}</p>
+                    <hr>
+                `;
+            });
         }
     </script>
 </body>
