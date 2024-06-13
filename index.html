@@ -26,19 +26,21 @@
             box-sizing: border-box;
         }
 
-        #container {
+        #container,
+        #container_show {
             min-width: 1200px;
             padding: 20px;
             border: 1px solid #ccc;
             border-radius: 5px;
             position: relative;
+            margin-top: 20px;
         }
 
         #fileDropArea {
             position: absolute;
             top: 0;
             right: 0;
-            height: 176px;
+            max-height: 163px;
             width: 250px;
             border: 2px dashed #349980;
             border-radius: 5px;
@@ -59,7 +61,8 @@
             display: none;
         }
 
-        .custom-file-upload {
+        .custom-file-upload,
+        .analisador {
             background-color: #349980;
             font-size: 16px;
             color: #fff;
@@ -70,10 +73,12 @@
             margin: 0 10px;
         }
 
-        .custom-file-upload:hover {
+        .custom-file-upload:hover,
+        .analisador:hover {
             background-color: #49b89c;
         }
 
+        #fileList,
         #result {
             margin-top: 20px;
         }
@@ -106,28 +111,44 @@
 
     <header id="masterhead">
         <logo>
-            <img height="80" class="site-logo"
-                src="http://suxberger.com.br/wp-content/uploads/2019/01/Suxberger-Logo-2.png" alt="Suxberger Soluções">
+            <img height="80" class="site-logo" src="http://suxberger.com.br/wp-content/uploads/2019/01/Suxberger-Logo-2.png"
+                alt="Suxberger Soluções">
         </logo>
     </header>
 
     <br>
 
     <main>
-        <div id="container">
-            <h1>Analisador XML</h1>
-            <div id="fileDropArea" ondrop="handleFileDrop(event)" ondragover="handleDragOver(event)">Arraste e solte arquivos aqui</div>
-            <div id="fileInputContainer">
-                <label for="fileInput" class="custom-file-upload">
-                    Escolher arquivos
-                </label>
-                <input type="file" id="fileInput" accept=".xml" multiple onchange="handleFileSelect(event)">
+        <article id="scan_xml">
+            <div id="container">
+                <h1>Analisador XML</h1>
+                <div id="fileDropArea" ondrop="handleFileDrop(event)" ondragover="handleDragOver(event)">Arraste e solte
+                    arquivos aqui</div>
+                <br><br>
+                <div id="fileInputContainer">
+                    <label for="fileInput" class="custom-file-upload">
+                        Escolher arquivos
+                    </label>
+                    <input type="file" id="fileInput" accept=".xml" multiple onchange="handleFileSelect(event)">
+                    <button class="analisador" onclick="analyzeFiles()">Analisar XML</button>
+                </div>
+                <div id="fileList"></div>
             </div>
-            <div id="fileList"></div> 
-            <div id="result"></div>
-        </div>
+        </article>
+
+        <br>
+
+        <article id="show_xml">
+            <div id="container_show">
+                <h1>Notas Salvas</h1>
+                <button class="analisador" onclick="fetchAllNotes()">Mostrar Todas as Notas</button>
+                <div id="result_notes"></div>
+            </div>
+        </article>
 
         <script>
+            let selectedFiles = [];
+
             function handleFileSelect(event) {
                 const fileList = event.target.files;
                 handleFiles(fileList);
@@ -144,20 +165,19 @@
             }
 
             function handleFiles(files) {
+                selectedFiles = files; // Store files in the global variable
                 const fileList = document.getElementById('fileList');
                 fileList.innerHTML = '';
                 for (let i = 0; i < Math.min(files.length, 20); i++) {
                     const file = files[i];
                     fileList.innerHTML += `<div>${file.name}</div>`;
                 }
-
-                processFiles(files);
             }
 
-            async function processFiles(files) {
+            async function analyzeFiles() {
                 const formData = new FormData();
-                for (let i = 0; i < files.length; i++) {
-                    formData.append('files', files[i]);
+                for (let i = 0; i < selectedFiles.length; i++) {
+                    formData.append('files', selectedFiles[i]);
                 }
 
                 try {
@@ -166,41 +186,53 @@
                         body: formData
                     });
                     const { results, totalValue } = await response.json();
-                    displayResults(results, totalValue);
+                    displayResults(results, totalValue, 'fileList');
                 } catch (error) {
                     console.error('Erro ao analisar XML:', error);
                 }
             }
 
-            function displayResults(data, totalValue) {
-                const resultDiv = document.getElementById('result');
+            async function fetchAllNotes() {
+                try {
+                    const response = await fetch('/getAllNotes', {
+                        method: 'GET',
+                    });
+                    const { results, totalValue } = await response.json();
+                    displayResults(results, totalValue, 'result_notes');
+                } catch (error) {
+                    console.error('Erro ao buscar notas:', error);
+                }
+            }
+
+            function displayResults(data, totalValue, resultElementId) {
+                const resultDiv = document.getElementById(resultElementId);
                 resultDiv.innerHTML = `
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Nº</th>
-                            <th>Razão Social Atendido</th>
-                            <th>Razão Social Emitida</th>
-                            <th>Data de Emissão</th>
-                            <th>Valor Total</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                    </tbody>
-                </table>
-                <h2>Total: ${totalValue.toFixed(2)}</h2>
-            `;
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Nº</th>
+                                <th>Razão Social Atendido</th>
+                                <th>Razão Social Emitida</th>
+                                <th>Data de Emissão</th>
+                                <th>Valor Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        </tbody>
+                    </table>
+                    <h2>Total: ${totalValue.toFixed(2)}</h2>
+                `;
                 const tbody = resultDiv.querySelector('tbody');
                 data.forEach((result, index) => {
                     tbody.innerHTML += `
-                    <tr>
-                        <td>${index + 1}</td>
-                        <td>${result.dest_xNome}</td>
-                        <td>${result.emit_xNome}</td>
-                        <td>${result.dhEmi}</td>
-                        <td>${parseFloat(result.vNF).toFixed(2)}</td>
-                    </tr>
-                `;
+                        <tr>
+                            <td>${index + 1}</td>
+                            <td>${result.dest_xNome}</td>
+                            <td>${result.emit_xNome}</td>
+                            <td>${result.dhEmi}</td>
+                            <td>${parseFloat(result.vNF).toFixed(2)}</td>
+                        </tr>
+                    `;
                 });
             }
         </script>
