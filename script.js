@@ -2,19 +2,26 @@ const express = require('express');
 const fileUpload = require('express-fileupload');
 const xml2js = require('xml2js');
 const fs = require('fs');
+const { Pool } = require('pg');
 
 const app = express();
 
 app.use(express.static('public'));
 app.use(fileUpload());
 
-// Rota para a página inicial
+const pool = new Pool({
+    user: 'postgres',
+    host: 'localhost',
+    database: 'postgres',
+    password: '0811',
+    port: 5432,
+});
+
 app.get('/', (req, res) => {
     res.sendFile(__dirname + '/index.html');
 });
 
-// Rota para analisar o XML
-app.post('/parseXML', (req, res) => { 
+app.post('/parseXML', (req, res) => {
     if (!req.files || !req.files.files) {
         return res.status(400).send('Nenhum arquivo enviado.');
     }
@@ -34,7 +41,9 @@ app.post('/parseXML', (req, res) => {
                     parseXML(filePath)
                         .then((data) => {
                             fs.unlink(filePath, () => {});
-                            resolve(data);
+                            insertIntoDatabase(data)
+                                .then(() => resolve(data))
+                                .catch(error => reject(error));
                         })
                         .catch((error) => reject(error));
                 }
@@ -50,7 +59,6 @@ app.post('/parseXML', (req, res) => {
         .catch((error) => res.status(500).send(error));
 });
 
-// Função para analisar o XML
 function parseXML(filePath) {
     return new Promise((resolve, reject) => {
         fs.readFile(filePath, 'utf8', (err, data) => {
@@ -70,7 +78,6 @@ function parseXML(filePath) {
     });
 }
 
-// Função para extrair campos do XML
 function extractFields(parsedXML) {
     const infNFe = parsedXML['nfeProc']?.['NFe']?.[0]?.['infNFe']?.[0];
     const ide = infNFe?.['ide']?.[0];
@@ -82,11 +89,33 @@ function extractFields(parsedXML) {
         dhEmi: ide?.dhEmi?.[0] || 'N/A',
         emit_xNome: emit?.xNome?.[0] || 'N/A',
         dest_xNome: dest?.xNome?.[0] || 'N/A',
-        vNF: total?.vNF?.[0] || '0',  // Default to '0' if not available
+        vNF: total?.vNF?.[0] || '0',
     };
 
     return fields;
 }
+
+function insertIntoDatabase(data) {
+    const query = `
+        INSERT INTO arq_xml (dhEmi, emit_xNome, dest_xNome, vNF)
+        VALUES ($1, $2, $3, $4)
+    `;
+    const values = [data.dhEmi, data.emit_xNome, data.dest_xNome, parseFloat(data.vNF)];
+
+    return pool.query(query, values);
+}
+
+app.get('/getAllNotes', async (req, res) => {
+    try {
+        const result = await pool.query('SELECT * FROM arq_xml');
+        const notes = result.rows;
+        const totalValue = notes.reduce((sum, note) => sum + parseFloat(note.vNF), 0);
+        res.json({ results: notes, totalValue });
+    } catch (error) {
+        console.error('Erro ao buscar notas:', error);
+        res.status(500).json({ error: 'Erro ao buscar notas' });
+    }
+});
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
