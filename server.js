@@ -27,53 +27,44 @@ app.post('/parseXML', (req, res) => {
     }
 
     const files = Array.isArray(req.files.files) ? req.files.files : [req.files.files];
-    const promises = [];
-
-    for (let i = 0; i < Math.min(files.length, 20); i++) {
-        const file = files[i];
+    const promises = files.slice(0, 20).map(file => new Promise((resolve, reject) => {
         const filePath = `${__dirname}/${file.name}`;
-
-        promises.push(new Promise((resolve, reject) => {
-            file.mv(filePath, (err) => {
-                if (err) {
-                    reject(err);
-                } else {
-                    parseXML(filePath)
-                        .then((data) => {
-                            fs.unlink(filePath, () => {});
-                            insertIntoDatabase(data)
-                                .then(() => resolve(data))
-                                .catch(error => reject(error));
-                        })
-                        .catch((error) => reject(error));
-                }
-            });
-        }));
-    }
+        file.mv(filePath, (err) => {
+            if (err) {
+                return reject(err);
+            }
+            parseXML(filePath)
+                .then(data => {
+                    fs.unlink(filePath, () => {});
+                    insertIntoDatabase(data)
+                        .then(() => resolve(data))
+                        .catch(error => reject(error));
+                })
+                .catch(error => reject(error));
+        });
+    }));
 
     Promise.all(promises)
-        .then((results) => {
-            const totalValue = results.reduce((sum, item) => sum + parseFloat(item.vNF), 0);
+        .then(results => {
+            const totalValue = results.reduce((sum, item) => sum + parseFloat(item.vNF || 0), 0);
             res.json({ results, totalValue });
         })
-        .catch((error) => res.status(500).send(error));
+        .catch(error => res.status(500).send(error));
 });
 
 function parseXML(filePath) {
     return new Promise((resolve, reject) => {
         fs.readFile(filePath, 'utf8', (err, data) => {
             if (err) {
-                reject(err);
-            } else {
-                xml2js.parseString(data, (err, result) => {
-                    if (err) {
-                        reject(err);
-                    } else {
-                        const fields = extractFields(result);
-                        resolve(fields);
-                    }
-                });
+                return reject(err);
             }
+            xml2js.parseString(data, (err, result) => {
+                if (err) {
+                    return reject(err);
+                }
+                const fields = extractFields(result);
+                resolve(fields);
+            });
         });
     });
 }
@@ -86,21 +77,26 @@ function extractFields(parsedXML) {
     const total = infNFe?.['total']?.[0]?.['ICMSTot']?.[0];
 
     const fields = {
-        dhEmi: ide?.dhEmi?.[0] || 'N/A',
-        emit_xNome: emit?.xNome?.[0] || 'N/A',
-        dest_xNome: dest?.xNome?.[0] || 'N/A',
-        vNF: total?.vNF?.[0] || '0',
+        dhEmi: ide?.dhEmi?.[0] || null,
+        emit_xNome: emit?.xNome?.[0] || null,
+        dest_xNome: dest?.xNome?.[0] || null,
+        vNF: total?.vNF?.[0] ? parseFloat(total.vNF[0]) : 0,
+        natOp: ide?.natOp?.[0] || null
     };
+
+    if (fields.dhEmi) {
+        fields.dhEmi = new Date(fields.dhEmi).toISOString();
+    }
 
     return fields;
 }
 
 function insertIntoDatabase(data) {
     const query = `
-        INSERT INTO arq_xml (dhEmi, emit_xNome, dest_xNome, vNF)
-        VALUES ($1, $2, $3, $4)
+        INSERT INTO arq_xml (dhEmi, emit_xNome, dest_xNome, vNF, natOp)
+        VALUES ($1, $2, $3, $4, $5)
     `;
-    const values = [data.dhEmi, data.emit_xNome, data.dest_xNome, parseFloat(data.vNF)];
+    const values = [data.dhEmi, data.emit_xNome, data.dest_xNome, data.vNF, data.natOp];
 
     return pool.query(query, values);
 }
@@ -109,7 +105,7 @@ app.get('/getAllNotes', async (req, res) => {
     try {
         const result = await pool.query('SELECT * FROM arq_xml');
         const notes = result.rows;
-        const totalValue = notes.reduce((sum, note) => sum + parseFloat(note.vNF), 0);
+        const totalValue = notes.reduce((sum, note) => sum + parseFloat(note.vnf || 0), 0);
         res.json({ results: notes, totalValue });
     } catch (error) {
         console.error('Erro ao buscar notas:', error);

@@ -108,16 +108,13 @@
 </head>
 
 <body>
-
     <header id="masterhead">
         <logo>
-            <img height="80" class="site-logo" src="http://suxberger.com.br/wp-content/uploads/2019/01/Suxberger-Logo-2.png"
-                alt="Suxberger Soluções">
+            <img height="80" class="site-logo"
+                src="http://suxberger.com.br/wp-content/uploads/2019/01/Suxberger-Logo-2.png" alt="Suxberger Soluções">
         </logo>
     </header>
-
     <br>
-
     <main>
         <article id="scan_xml">
             <div id="container">
@@ -126,117 +123,127 @@
                     arquivos aqui</div>
                 <br><br>
                 <div id="fileInputContainer">
-                    <label for="fileInput" class="custom-file-upload">
-                        Escolher arquivos
-                    </label>
+                    <label for="fileInput" class="custom-file-upload">Escolher arquivos</label>
                     <input type="file" id="fileInput" accept=".xml" multiple onchange="handleFileSelect(event)">
-                    <button class="analisador" onclick="analyzeFiles()">Analisar XML</button>
+                    <button class="analisador" onclick="analyzeFiles()">Adicionar XML</button>
                 </div>
-                <div id="fileList"></div>
             </div>
         </article>
-
         <br>
-
         <article id="show_xml">
             <div id="container_show">
                 <h1>Notas Salvas</h1>
-                <button class="analisador" onclick="fetchAllNotes()">Mostrar Todas as Notas</button>
                 <div id="result_notes"></div>
             </div>
         </article>
-
-        <script>
-            let selectedFiles = [];
-
-            function handleFileSelect(event) {
-                const fileList = event.target.files;
-                handleFiles(fileList);
-            }
-
-            function handleFileDrop(event) {
-                event.preventDefault();
-                const fileList = event.dataTransfer.files;
-                handleFiles(fileList);
-            }
-
-            function handleDragOver(event) {
-                event.preventDefault();
-            }
-
-            function handleFiles(files) {
-                selectedFiles = files; // Store files in the global variable
-                const fileList = document.getElementById('fileList');
-                fileList.innerHTML = '';
-                for (let i = 0; i < Math.min(files.length, 20); i++) {
-                    const file = files[i];
-                    fileList.innerHTML += `<div>${file.name}</div>`;
-                }
-            }
-
-            async function analyzeFiles() {
-                const formData = new FormData();
-                for (let i = 0; i < selectedFiles.length; i++) {
-                    formData.append('files', selectedFiles[i]);
-                }
-
-                try {
-                    const response = await fetch('/parseXML', {
-                        method: 'POST',
-                        body: formData
-                    });
-                    const { results, totalValue } = await response.json();
-                    displayResults(results, totalValue, 'fileList');
-                } catch (error) {
-                    console.error('Erro ao analisar XML:', error);
-                }
-            }
-
-            async function fetchAllNotes() {
-                try {
-                    const response = await fetch('/getAllNotes', {
-                        method: 'GET',
-                    });
-                    const { results, totalValue } = await response.json();
-                    displayResults(results, totalValue, 'result_notes');
-                } catch (error) {
-                    console.error('Erro ao buscar notas:', error);
-                }
-            }
-
-            function displayResults(data, totalValue, resultElementId) {
-                const resultDiv = document.getElementById(resultElementId);
-                resultDiv.innerHTML = `
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Nº</th>
-                                <th>Razão Social Atendido</th>
-                                <th>Razão Social Emitida</th>
-                                <th>Data de Emissão</th>
-                                <th>Valor Total</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                        </tbody>
-                    </table>
-                    <h2>Total: ${totalValue.toFixed(2)}</h2>
-                `;
-                const tbody = resultDiv.querySelector('tbody');
-                data.forEach((result, index) => {
-                    tbody.innerHTML += `
-                        <tr>
-                            <td>${index + 1}</td>
-                            <td>${result.dest_xNome}</td>
-                            <td>${result.emit_xNome}</td>
-                            <td>${result.dhEmi}</td>
-                            <td>${parseFloat(result.vNF).toFixed(2)}</td>
-                        </tr>
-                    `;
-                });
-            }
-        </script>
     </main>
+    <script>
+        let selectedFiles = [];
+
+        function handleFileSelect(event) {
+            const fileList = event.target.files;
+            handleFiles(fileList);
+        }
+
+        function handleFileDrop(event) {
+            event.preventDefault();
+            const fileList = event.dataTransfer.files;
+            handleFiles(fileList);
+        }
+
+        function handleDragOver(event) {
+            event.preventDefault();
+        }
+
+        function handleFiles(files) {
+            selectedFiles = files;
+            const fileList = document.getElementById('fileList');
+            fileList.innerHTML = '';
+            for (let i = 0; i < Math.min(files.length, 20); i++) {
+                const file = files[i];
+                fileList.innerHTML += `<div>${file.name}</div>`;
+            }
+        }
+
+        async function analyzeFiles() {
+            const formData = new FormData();
+            for (let i = 0; i < selectedFiles.length; i++) {
+                formData.append('files', selectedFiles[i]);
+            }
+
+            try {
+                const response = await fetch('/parseXML', {
+                    method: 'POST',
+                    body: formData
+                });
+                const { results, totalValue } = await response.json();
+                console.log('Analyze Results:', results);
+                displayResults(results, totalValue, 'fileList');
+                window.location.reload();
+            } catch (error) {
+                console.error('Erro ao analisar XML:', error);
+            }
+        }
+
+        async function fetchAllNotes() {
+            try {
+                const response = await fetch('/getAllNotes', {
+                    method: 'GET',
+                });
+                const { results, totalValue } = await response.json();
+                console.log('Fetch Results:', results);
+                displayResults(results, totalValue, 'result_notes');
+            } catch (error) {
+                console.error('Erro ao buscar notas:', error);
+            }
+        }
+
+        function displayResults(data, totalValue, resultElementId) {
+            console.log('Display Results Data:', data);
+            const resultDiv = document.getElementById(resultElementId);
+            resultDiv.innerHTML = `
+        <table>
+            <thead>
+                <tr>
+                    <th>Nº</th>
+                    <th>Razão Social Atendido</th>
+                    <th>Razão Social Emitida</th>
+                    <th>Data de Emissão</th>
+                    <th>Valor Total</th>
+                    <th>Natureza da Operação</th> <!-- Novo cabeçalho -->
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+        <h2>Total: ${totalValue ? totalValue.toFixed(2) : '0.00'}</h2>
+    `;
+
+            const tbody = resultDiv.querySelector('tbody');
+            if (data && data.length > 0) {
+                data.forEach((result, index) => {
+                    const newRow = document.createElement('tr');
+                    newRow.innerHTML = `
+                <td>${index + 1}</td>
+                <td>${result.dest_xnome || '-'}</td>
+                <td>${result.emit_xnome || '-'}</td>
+                <td>${result.dhemi ? new Date(result.dhemi).toLocaleString() : '-'}</td>
+                <td>${result.vnf !== null ? parseFloat(result.vnf).toFixed(2) : '0.00'}</td>
+                <td>${result.natop || '-'}</td> <!-- Exibir natop -->
+            `;
+                    tbody.appendChild(newRow);
+                });
+            } else {
+                const emptyRow = document.createElement('tr');
+                emptyRow.innerHTML = '<td colspan="6">Nenhuma nota encontrada.</td>';
+                tbody.appendChild(emptyRow);
+            }
+        }
+
+        
+        window.onload = function () {
+            fetchAllNotes();
+        };
+    </script>
 </body>
 
 </html>
